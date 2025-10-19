@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Adaptive Learning Assistant</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      min-height: 400px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+      padding: 0;
+    }
+
+    .container {
+      background: white;
+      margin: 10px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .content {
+      padding: 20px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      font-size: 13px;
+      border-left: 4px solid #667eea;
+    }
+
+    .feature-item::before {
+      content: "✨";
+      margin-right: 8px;
+      font-size: 16px;
+    }
+
+    .settings-btn {
+      width: 100%;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .settings-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .status {
+      text-align: center;
+      padding: 15px;
+      background: #e8f4fd;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 13px;
+      color: #2c5aa0;
+    }
+
+    .status.ready {
+      background: #e8f5e8;
+      color: #2e7d32;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🧠 Adaptive Learning Assistant</h1>
+      <p>AI-Powered Text Learning Tools</p>
+    </div>
+
+    <div class="content">
+      <div id="ai-status" class="status">
+        Checking AI availability...
+      </div>
+
+      <p style="margin-bottom: 15px; font-size: 14px; color: #666;">
+        Select text on any webpage and use the floating menu to:
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-item">Summarize content</div>
+        <div class="feature-item">Translate text</div>
+        <div class="feature-item">Ask questions</div>
+        <div class="feature-item">Generate quizzes</div>
+        <div class="feature-item">Simplify text</div>
+        <div class="feature-item">Check answers</div>
+      </div>
+
+      <button id="settings-btn" class="settings-btn">⚙️ Settings</button>
+    </div>
+  </div>
+
+  <script src="../js/popup.js"></script>
+</body>
+</html>

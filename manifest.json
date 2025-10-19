@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Adaptive Learning Assistant",
+  "version": "1.0",
+  "description": "Turn passive reading into active, personalized learning with AI-powered tools for summarization, translation, quizzes, and more.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["js/content.js"],
+      "css": ["css/content.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "html/popup.html",
+    "default_icon": "icons/téléchargement.png"
+  },
+  "options_page": "html/options.html",
+  "icons": {
+    "16": "icons/téléchargement.png",
+    "48": "icons/téléchargement.png",
+    "128": "icons/téléchargement.png"
+  }
+}

@@ -1,0 +1,388 @@
+document.addEventListener('mouseup', function(event) {
+  const selectedText = window.getSelection().toString().trim();
+  if (selectedText.length > 0) {
+    showFloatingUI(event.clientX, event.clientY, selectedText);
+  } else {
+    hideFloatingUI();
+  }
+});
+
+function showFloatingUI(x, y, text) {
+  let ui = document.getElementById('ala-floating-ui');
+  if (!ui) {
+    ui = document.createElement('div');
+    ui.id = 'ala-floating-ui';
+    ui.innerHTML = `
+      <button id="summarize-btn">Summarize</button>
+      <button id="translate-btn">Translate</button>
+      <button id="prompt-btn">Ask About</button>
+      <button id="quiz-btn">Quiz</button>
+      <button id="simplify-btn">Simplify</button>
+      <button id="proofread-btn">Check Answer</button>
+    `;
+    document.body.appendChild(ui);
+
+    // Add event listeners only once when creating the UI
+    document.getElementById('summarize-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      handleSummarize(text);
+    });
+    document.getElementById('translate-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      handleTranslate(text);
+    });
+    document.getElementById('prompt-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      handlePrompt(text);
+    });
+    document.getElementById('quiz-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      handleQuiz(text);
+    });
+    document.getElementById('simplify-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      handleSimplify(text);
+    });
+    document.getElementById('proofread-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      handleProofread(text);
+    });
+  }
+  ui.style.left = x + 'px';
+  ui.style.top = y + 'px';
+  ui.style.display = 'block';
+}
+
+function hideFloatingUI() {
+  const ui = document.getElementById('ala-floating-ui');
+  if (ui) {
+    ui.style.display = 'none';
+  }
+}
+
+async function handleSummarize(text) {
+  showLoading('Generating summary...');
+  try {
+    const summary = await callAPI('summarizer', { text });
+    displayResult('Summary', summary);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function handleTranslate(text) {
+  chrome.storage.sync.get(['preferredLanguage'], async function(result) {
+    const defaultLang = result.preferredLanguage || 'English';
+    const language = prompt('Enter target language:', defaultLang);
+    if (language) {
+      showLoading('Translating text...');
+      try {
+        const translation = await callAPI('translator', { text, target: language });
+        displayResult('Translation', translation);
+      } finally {
+        hideLoading();
+      }
+    }
+  });
+}
+
+async function handlePrompt(text) {
+  const question = prompt('Ask a question about the text or related image:');
+  if (question) {
+    showLoading('Thinking...');
+    try {
+      const answer = await callAPI('prompt', { text, question });
+      displayResult('Answer', answer);
+    } finally {
+      hideLoading();
+    }
+  }
+}
+
+async function handleQuiz(text) {
+  showLoading('Creating quiz...');
+  try {
+    const quiz = await callAPI('writer', { text, type: 'quiz' });
+    displayResult('Quiz', quiz);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function handleSimplify(text) {
+  chrome.storage.sync.get(['simplificationLevel'], async function(result) {
+    const defaultLevel = result.simplificationLevel || '5th grader';
+    const level = prompt('Simplify for what level? (e.g., 5th grader, business jargon):', defaultLevel);
+    if (level) {
+      showLoading('Simplifying text...');
+      try {
+        const simplified = await callAPI('rewriter', { text, level });
+        displayResult('Simplified', simplified);
+      } finally {
+        hideLoading();
+      }
+    }
+  });
+}
+
+async function handleProofread(text) {
+  showLoading('Checking answer...');
+  try {
+    const corrected = await callAPI('proofreader', { text });
+    displayResult('Corrected Answer', corrected);
+  } finally {
+    hideLoading();
+  }
+}
+
+function showLoading(message) {
+  let overlay = document.getElementById('ala-loading-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'ala-loading-overlay';
+    overlay.className = 'ala-loading-overlay';
+    overlay.innerHTML = `
+      <div class="ala-loading-modal">
+        <div class="ala-loading"></div>
+        <div class="loading-text">${message}</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  } else {
+    overlay.querySelector('.loading-text').textContent = message;
+  }
+  overlay.style.display = 'flex';
+}
+
+function hideLoading() {
+  const overlay = document.getElementById('ala-loading-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+async function callAPI(api, params) {
+  try {
+    // Check if AI API is available
+    if (!('ai' in self) || !('languageModel' in self.ai)) {
+      return `AI API not available. This feature requires Google Chrome with Gemini Nano support.\n\nStep-by-step instructions:\n1. Ensure you're using the latest version of Google Chrome.\n2. Open Chrome settings and search for "Gemini Nano" or navigate to chrome://settings/?search=gemini+nano.\n3. Enable Gemini Nano if available.\n4. If not available, update Chrome to the latest stable version.\n5. Reload the extension and try again.`;
+    }
+
+    const availability = await self.ai.languageModel.availability();
+    switch (availability) {
+      case 'available':
+        // Proceed to create session
+        break;
+      case 'downloadable':
+        return `Gemini Nano model is available for download.\n\nTo enable:\n1. Go to Chrome settings: chrome://settings/?search=gemini+nano\n2. Toggle on "Use Gemini Nano in Chrome"\n3. Wait for the model to download\n4. Reload the page and try again.`;
+      case 'downloading':
+        return `Gemini Nano model is currently downloading. Please wait for the download to complete (this may take a few minutes) and try again.`;
+      case 'unavailable':
+      default:
+        return `Gemini Nano is not available on your device or Chrome version.\n\nTroubleshooting steps:\n1. Update Google Chrome to the latest version\n2. Ensure your device meets system requirements (sufficient storage, RAM)\n3. Check if Gemini Nano is supported in your region\n4. Visit chrome://version to verify Chrome version\n5. If issues persist, Gemini Nano may not be available yet.`;
+    }
+
+    // Create session with initial system prompt and expected output language
+    const session = await self.ai.languageModel.create({
+      initialPrompts: [
+        { role: 'system', content: 'You are a helpful AI assistant for learning and text processing tasks.' }
+      ],
+      expectedOutputs: [
+        {
+          type: 'text',
+          languages: ['en'] // Specify English as the expected output language
+        }
+      ]
+    });
+
+    let prompt = '';
+
+    switch (api) {
+      case 'summarizer':
+        prompt = `Please summarize the following text in a concise way:\n\n${params.text}`;
+        break;
+      case 'translator':
+        prompt = `Please translate the following text to ${params.target}:\n\n${params.text}`;
+        break;
+      case 'prompt':
+        prompt = `${params.question}\n\nContext: ${params.text}`;
+        break;
+      case 'writer':
+        prompt = `Generate a quiz question based on this text:\n\n${params.text}`;
+        break;
+      case 'rewriter':
+        const tone = params.level.includes('business') ? 'formal' : 'simple';
+        prompt = `Rewrite the following text in a ${tone} tone, suitable for ${params.level}:\n\n${params.text}`;
+        break;
+      case 'proofreader':
+        prompt = `Please proofread and correct the following text:\n\n${params.text}`;
+        break;
+      default:
+        return `Unknown API: ${api}`;
+    }
+
+    return await session.prompt(prompt);
+  } catch (error) {
+    return `Error calling ${api} API: ${error.message}`;
+  }
+}
+
+function displayResult(title, content) {
+  let resultDiv = document.getElementById('ala-result');
+  if (!resultDiv) {
+    resultDiv = document.createElement('div');
+    resultDiv.id = 'ala-result';
+    resultDiv.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 380px;
+      max-height: 600px;
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      z-index: 10001;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+    `;
+    document.body.appendChild(resultDiv);
+  }
+
+  // Enhanced content formatting
+  let formattedContent = content;
+
+  // Check if this is an error message
+  const isError = title.includes('Error') || content.includes('AI API not available') || content.includes('AI model not available');
+
+  if (isError) {
+    // Format error messages with better styling
+    formattedContent = `
+      <div style="background: #fee; border-left: 4px solid #e74c3c; padding: 16px; border-radius: 8px; margin: 8px 0;">
+        <div style="display: flex; align-items: center; margin-bottom: 12px;">
+          <span style="font-size: 20px; margin-right: 8px;">⚠️</span>
+          <strong style="color: #c0392b; font-size: 16px;">AI Feature Unavailable</strong>
+        </div>
+        <div style="color: #555; line-height: 1.6; font-size: 14px;">${formattedContent.replace(/\n/g, '<br>')}</div>
+      </div>
+    `;
+  } else {
+    // Format regular responses with better typography
+    formattedContent = formatResponseContent(title, formattedContent);
+  }
+
+  resultDiv.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee;">
+      <h3 style="margin: 0; color: #333; font-size: 20px; font-weight: 600; display: flex; align-items: center;">
+        <span style="margin-right: 8px;">${getTitleIcon(title)}</span>
+        ${title}
+      </h3>
+      <button id="close-result-btn" style="
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #666;
+        padding: 5px;
+        border-radius: 50%;
+        transition: all 0.2s;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      " title="Close">×</button>
+    </div>
+    <div style="color: #555; line-height: 1.7; font-size: 15px;">${formattedContent}</div>
+  `;
+
+  // Add close functionality
+  const closeBtn = resultDiv.querySelector('#close-result-btn');
+  closeBtn.addEventListener('click', () => {
+    resultDiv.style.display = 'none';
+  });
+
+  closeBtn.addEventListener('mouseenter', () => {
+    closeBtn.style.background = '#f0f0f0';
+    closeBtn.style.transform = 'scale(1.1)';
+  });
+
+  closeBtn.addEventListener('mouseleave', () => {
+    closeBtn.style.background = 'none';
+    closeBtn.style.transform = 'scale(1)';
+  });
+
+  resultDiv.style.display = 'block';
+}
+
+function getTitleIcon(title) {
+  const icons = {
+    'Summary': '📝',
+    'Translation': '🌍',
+    'Answer': '💡',
+    'Quiz': '📚',
+    'Simplified': '🔄',
+    'Corrected Answer': '✓',
+    'Error': '❌',
+    'AI model not available': '⚠️'
+  };
+  return icons[title] || '📄';
+}
+
+function formatResponseContent(title, content) {
+  let formatted = content.replace(/\n/g, '<br>');
+
+  // Special formatting for different response types
+  switch (title) {
+    case 'Translation':
+      formatted = `<div style="background: #f0f8ff; padding: 16px; border-radius: 8px; border-left: 4px solid #667eea;">
+        <div style="font-style: italic; color: #666; margin-bottom: 8px; font-size: 13px;">Translated Text:</div>
+        <div style="color: #2c3e50; font-weight: 500;">${formatted}</div>
+      </div>`;
+      break;
+
+    case 'Summary':
+      formatted = `<div style="background: #fff8e1; padding: 16px; border-radius: 8px; border-left: 4px solid #ffb300;">
+        <div style="font-weight: 600; color: #f57c00; margin-bottom: 12px;">📋 Key Points:</div>
+        <div style="line-height: 1.8;">${formatted}</div>
+      </div>`;
+      break;
+
+    case 'Answer':
+      formatted = `<div style="background: #e8f5e8; padding: 16px; border-radius: 8px; border-left: 4px solid #4caf50;">
+        <div style="font-weight: 600; color: #2e7d32; margin-bottom: 12px;">💡 AI Response:</div>
+        <div style="line-height: 1.8;">${formatted}</div>
+      </div>`;
+      break;
+
+    case 'Quiz':
+      // Format quiz questions with better structure
+      formatted = formatted.replace(/(\d+\.\s*[^?]+\?)/g, '<div style="font-weight: 600; color: #1976d2; margin: 12px 0 8px 0;">$1</div>');
+      formatted = `<div style="background: #f3e5f5; padding: 16px; border-radius: 8px; border-left: 4px solid #9c27b0;">
+        <div style="font-weight: 600; color: #7b1fa2; margin-bottom: 12px;">🧠 Quiz Questions:</div>
+        <div style="line-height: 1.8;">${formatted}</div>
+      </div>`;
+      break;
+
+    case 'Simplified':
+      formatted = `<div style="background: #fff3e0; padding: 16px; border-radius: 8px; border-left: 4px solid #ff9800;">
+        <div style="font-weight: 600; color: #e65100; margin-bottom: 12px;">🔄 Simplified Version:</div>
+        <div style="line-height: 1.8; font-size: 15px;">${formatted}</div>
+      </div>`;
+      break;
+
+    case 'Corrected Answer':
+      formatted = `<div style="background: #e3f2fd; padding: 16px; border-radius: 8px; border-left: 4px solid #2196f3;">
+        <div style="font-weight: 600; color: #0d47a1; margin-bottom: 12px;">✓ Corrected Version:</div>
+        <div style="line-height: 1.8;">${formatted}</div>
+      </div>`;
+      break;
+
+    default:
+      formatted = `<div style="line-height: 1.8;">${formatted}</div>`;
+  }
+
+  return formatted;
+}
