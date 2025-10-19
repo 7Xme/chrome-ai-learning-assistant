@@ -141,8 +141,30 @@ function showFloatingUI(x, y, text) {
       handleVoicePrompt(text);
     });
   }
-  ui.style.left = x + 'px';
-  ui.style.top = y + 'px';
+  // Position the UI, ensuring it stays within viewport bounds
+  const uiRect = ui.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  let finalX = x;
+  let finalY = y;
+
+  // Adjust horizontal position if UI goes outside right edge
+  if (x + uiRect.width > viewportWidth) {
+    finalX = viewportWidth - uiRect.width - 10; // 10px margin from edge
+  }
+
+  // Adjust vertical position if UI goes outside bottom edge
+  if (y + uiRect.height > viewportHeight) {
+    finalY = viewportHeight - uiRect.height - 10; // 10px margin from edge
+  }
+
+  // Ensure UI doesn't go outside left/top edges either
+  finalX = Math.max(10, finalX); // 10px margin from left edge
+  finalY = Math.max(10, finalY); // 10px margin from top edge
+
+  ui.style.left = finalX + 'px';
+  ui.style.top = finalY + 'px';
   ui.style.display = 'block';
 }
 
