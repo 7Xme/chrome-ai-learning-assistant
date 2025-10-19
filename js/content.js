@@ -238,48 +238,79 @@ async function handleVoicePrompt(text) {
     return;
   }
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  // Get speech language from settings
-  chrome.storage.sync.get(['speechLanguage'], function(result) {
-    recognition.lang = result.speechLanguage || 'en-US';
-  });
-
-  recognition.onstart = function() {
-    showLoading('Listening... Speak your question now.');
-  };
-
-  recognition.onresult = async function(event) {
-    const transcript = event.results[0][0].transcript;
-    showLoading('Processing your voice question...');
-
-    try {
-      const answer = await callAPI('prompt', { text, question: transcript });
-      displayResult(`Voice Question: "${transcript}"`, answer);
-    } catch (error) {
-      displayResult('Voice Processing Error', `Error processing your voice input: ${error.message}`);
-    } finally {
-      hideLoading();
-    }
-  };
-
-  recognition.onerror = function(event) {
-    hideLoading();
-    displayResult('Voice Recognition Error', `Speech recognition error: ${event.error}. Please try again or use text input.`);
-  };
-
-  recognition.onend = function() {
-    // Hide loading if still showing
-    hideLoading();
-  };
-
   try {
-    recognition.start();
-  } catch (error) {
-    displayResult('Voice Start Error', `Could not start voice recognition: ${error.message}`);
+    // Request microphone permission if needed
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+
+    // Get speech language from settings and initialize recognition
+    chrome.storage.sync.get(['speechLanguage'], async function(result) {
+      const speechLang = result.speechLanguage || 'en-US';
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = speechLang;
+
+      recognition.onstart = function() {
+        showLoading('Listening... Speak your question now.');
+      };
+
+      recognition.onresult = async function(event) {
+        const transcript = event.results[0][0].transcript;
+        showLoading('Processing your voice question...');
+
+        try {
+          const answer = await callAPI('prompt', { text, question: transcript });
+          displayResult(`Voice Question: "${transcript}"`, answer);
+        } catch (error) {
+          displayResult('Voice Processing Error', `Error processing your voice input: ${error.message}`);
+        } finally {
+          hideLoading();
+        }
+      };
+
+      recognition.onerror = function(event) {
+        hideLoading();
+        let errorMessage = 'Unknown speech recognition error occurred.';
+
+        switch(event.error) {
+          case 'not-allowed':
+            errorMessage = 'Microphone access denied. Please allow microphone access and try again.';
+            break;
+          case 'no-speech':
+            errorMessage = 'No speech detected. Please speak clearly and try again.';
+            break;
+          case 'audio-capture':
+            errorMessage = 'Audio capture failed. Please check your microphone and try again.';
+            break;
+          case 'network':
+            errorMessage = 'Network error occurred. Please check your connection and try again.';
+            break;
+          default:
+            errorMessage = `Speech recognition error: ${event.error}. Please try again or use text input.`;
+        }
+
+        displayResult('Voice Recognition Error', errorMessage);
+      };
+
+      recognition.onend = function() {
+        // Hide loading if still showing
+        hideLoading();
+      };
+
+      try {
+        recognition.start();
+      } catch (error) {
+        displayResult('Voice Start Error', `Could not start voice recognition: ${error.message}`);
+      }
+    });
+
+  } catch (permissionError) {
+    displayResult('Microphone Permission Required', 'Microphone access is required for voice input. Please allow microphone access when prompted, or enable it in your browser settings for this site.');
   }
 }
   try {
