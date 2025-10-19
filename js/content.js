@@ -164,9 +164,20 @@ async function handleSummarize(text) {
 }
 
 async function handleTranslate(text) {
-  chrome.storage.sync.get(['preferredLanguage'], async function(result) {
+  chrome.storage.sync.get(['preferredLanguage', 'translationLanguages'], async function(result) {
     const defaultLang = result.preferredLanguage || 'English';
-    const language = prompt('Enter target language:', defaultLang);
+    const supportedLanguages = result.translationLanguages || ['spanish', 'french', 'german'];
+
+    // Create enhanced language prompt with suggestions
+    let languagePrompt = 'Enter target language:';
+    if (supportedLanguages.length > 0) {
+      languagePrompt += '\n\nSuggested languages: ' + supportedLanguages.map(lang =>
+        lang.charAt(0).toUpperCase() + lang.slice(1)
+      ).join(', ');
+    }
+    languagePrompt += '\n\nOr enter any language you prefer.';
+
+    const language = prompt(languagePrompt, defaultLang);
     if (language) {
       showLoading('Translating text...');
       try {
@@ -232,7 +243,10 @@ async function handleVoicePrompt(text) {
 
   recognition.continuous = false;
   recognition.interimResults = false;
-  recognition.lang = 'en-US'; // Default to English, can be made configurable later
+  // Get speech language from settings
+  chrome.storage.sync.get(['speechLanguage'], function(result) {
+    recognition.lang = result.speechLanguage || 'en-US';
+  });
 
   recognition.onstart = function() {
     showLoading('Listening... Speak your question now.');
@@ -422,6 +436,9 @@ function displayResult(title, content) {
       </h3>
       <div style="display: flex; gap: 8px;">
         ${shouldShowExport(title) ? '<button id="export-result-btn" style="background: #4CAF50; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;" title="Export">📄 Export</button>' : ''}
+        ${shouldShowIntegrations(title) ? '<button id="integrate-quizlet-btn" style="background: #FF6B35; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;" title="Send to Quizlet">📚 Quizlet</button>' : ''}
+        ${shouldShowIntegrations(title) ? '<button id="integrate-anki-btn" style="background: #2D5AA0; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;" title="Send to Anki">🃏 Anki</button>' : ''}
+        ${shouldShowIntegrations(title) ? '<button id="integrate-classroom-btn" style="background: #34A853; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;" title="Send to Google Classroom">🏫 Classroom</button>' : ''}
         <button id="close-result-btn" style="
           background: none;
           border: none;
@@ -453,6 +470,28 @@ function displayResult(title, content) {
   if (exportBtn) {
     exportBtn.addEventListener('click', () => {
       exportResult(title, content);
+    });
+  }
+
+  // Add integration functionality
+  const quizletBtn = resultDiv.querySelector('#integrate-quizlet-btn');
+  if (quizletBtn) {
+    quizletBtn.addEventListener('click', () => {
+      integrateWithQuizlet(title, content);
+    });
+  }
+
+  const ankiBtn = resultDiv.querySelector('#integrate-anki-btn');
+  if (ankiBtn) {
+    ankiBtn.addEventListener('click', () => {
+      integrateWithAnki(title, content);
+    });
+  }
+
+  const classroomBtn = resultDiv.querySelector('#integrate-classroom-btn');
+  if (classroomBtn) {
+    classroomBtn.addEventListener('click', () => {
+      integrateWithClassroom(title, content);
     });
   }
 
@@ -551,9 +590,85 @@ function showNotification(message, details, type = 'success') {
   return icons[title] || '📄';
 }
 
+// Learning platform integration functions
+function integrateWithQuizlet(title, content) {
+  try {
+    // Create a formatted version of the content for Quizlet
+    let quizletContent = '';
+
+    if (title === 'Quiz') {
+      // Parse quiz content and format for Quizlet
+      quizletContent = formatForQuizlet(content);
+    } else {
+      // For summaries, create study cards
+      quizletContent = formatSummaryForQuizlet(title, content);
+    }
+
+    // Open Quizlet create page in new tab
+    const quizletUrl = `https://quizlet.com/create-set?title=${encodeURIComponent(title + ' - AI Generated')}&terms=${encodeURIComponent(quizletContent)}`;
+    window.open(quizletUrl, '_blank');
+
+    showNotification('Quizlet Integration', 'Opening Quizlet in new tab...', 'success');
+  } catch (error) {
+    showNotification('Quizlet Integration Failed', `Error: ${error.message}`, 'error');
+  }
+}
+
+function integrateWithAnki(title, content) {
+  try {
+    let ankiContent = '';
+
+    if (title === 'Quiz') {
+      ankiContent = formatForAnki(content);
+    } else {
+      ankiContent = formatSummaryForAnki(title, content);
+    }
+
+    // Create download link for Anki-compatible text file
+    const blob = new Blob([ankiContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_anki.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showNotification('Anki Export Ready', 'File downloaded. Import into Anki using "Text separated by tabs or semicolons"', 'success');
+  } catch (error) {
+    showNotification('Anki Export Failed', `Error: ${error.message}`, 'error');
+  }
+}
+
+function integrateWithClassroom(title, content) {
+  try {
+    // Format content for Google Classroom assignment
+    const classroomContent = formatForClassroom(title, content);
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(classroomContent).then(() => {
+      // Open Google Classroom in new tab
+      window.open('https://classroom.google.com', '_blank');
+      showNotification('Google Classroom Ready', 'Content copied to clipboard. Create new assignment in Classroom and paste the content.', 'success');
+    }).catch(err => {
+      showNotification('Clipboard Error', 'Could not copy to clipboard. Please manually copy the content.', 'error');
+      console.log('Classroom content:', classroomContent);
+    });
+  } catch (error) {
+    showNotification('Google Classroom Failed', `Error: ${error.message}`, 'error');
+  }
+}
+
 function shouldShowExport(title) {
   // Show export button for summaries and quizzes
   return title === 'Summary' || title === 'Quiz' || title.startsWith('Voice Question:');
+}
+
+function shouldShowIntegrations(title) {
+  // Show integration buttons for quizzes and summaries
+  return title === 'Quiz' || title === 'Summary' || title.startsWith('Voice Question:');
 }
 
 function exportResult(title, content) {
@@ -623,6 +738,104 @@ function showNotification(message, details, type = 'success') {
       setTimeout(() => notification.remove(), 300);
     }
   }, 3000);
+}
+
+// Content formatting functions
+function formatForQuizlet(content) {
+  // Convert quiz questions into Quizlet flashcard format
+  const lines = content.split('\n');
+  const cards = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.match(/^\d+\./) || line.includes('?')) {
+      // This is a question
+      const question = line.replace(/^\d+\.\s*/, '');
+      // Look for answer in next lines
+      let answer = '';
+      for (let j = i + 1; j < lines.length && j < i + 3; j++) {
+        if (lines[j].trim() && !lines[j].match(/^\d+\./)) {
+          answer += lines[j].trim() + ' ';
+        } else {
+          break;
+        }
+      }
+      if (question && answer.trim()) {
+        cards.push(`${question.trim()};${answer.trim()}`);
+      }
+    }
+  }
+
+  return cards.join('\n');
+}
+
+function formatSummaryForQuizlet(title, content) {
+  // Break summary into key points for flashcards
+  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 10);
+  const cards = [];
+
+  sentences.forEach((sentence, index) => {
+    const key = `Key Point ${index + 1}`;
+    const value = sentence.trim();
+    if (value) {
+      cards.push(`${key};${value}`);
+    }
+  });
+
+  return cards.join('\n');
+}
+
+function formatForAnki(content) {
+  // Format for Anki import (tab-separated)
+  const lines = content.split('\n');
+  const cards = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.match(/^\d+\./) || line.includes('?')) {
+      const question = line.replace(/^\d+\.\s*/, '');
+      let answer = '';
+      for (let j = i + 1; j < lines.length && j < i + 3; j++) {
+        if (lines[j].trim() && !lines[j].match(/^\d+\./)) {
+          answer += lines[j].trim() + ' ';
+        } else {
+          break;
+        }
+      }
+      if (question && answer.trim()) {
+        cards.push(`${question.trim()}\t${answer.trim()}`);
+      }
+    }
+  }
+
+  return cards.join('\n');
+}
+
+function formatSummaryForAnki(title, content) {
+  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 10);
+  const cards = [];
+
+  sentences.forEach((sentence, index) => {
+    const front = `Key Point ${index + 1}`;
+    const back = sentence.trim();
+    if (back) {
+      cards.push(`${front}\t${back}`);
+    }
+  });
+
+  return cards.join('\n');
+}
+
+function formatForClassroom(title, content) {
+  return `📚 AI-Generated Study Material
+
+${title}
+
+${content}
+
+---
+Generated by Adaptive Learning Assistant
+Chrome Extension for AI-Powered Learning`;
 }
 
 function formatResponseContent(title, content) {

@@ -3,17 +3,21 @@ document.addEventListener('DOMContentLoaded', function() {
   const preferredLanguage = document.getElementById('preferredLanguage');
   const simplificationLevel = document.getElementById('simplificationLevel');
   const theme = document.getElementById('theme');
+  const translationLanguages = document.getElementById('translationLanguages');
+  const speechLanguage = document.getElementById('speechLanguage');
   const successMessage = document.getElementById('success-message');
   const aiStatusDiv = document.getElementById('ai-status');
 
   let originalSettings = {};
 
   // Load saved settings
-  chrome.storage.sync.get(['preferredLanguage', 'simplificationLevel', 'theme'], function(result) {
+  chrome.storage.sync.get(['preferredLanguage', 'simplificationLevel', 'theme', 'translationLanguages', 'speechLanguage'], function(result) {
     originalSettings = {
       preferredLanguage: result.preferredLanguage || '',
       simplificationLevel: result.simplificationLevel || '5th grader',
-      theme: result.theme || 'light'
+      theme: result.theme || 'light',
+      translationLanguages: result.translationLanguages || ['spanish', 'french', 'german'],
+      speechLanguage: result.speechLanguage || 'en-US'
     };
 
     if (result.preferredLanguage) {
@@ -24,6 +28,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (result.theme) {
       theme.value = result.theme;
+    }
+    if (result.translationLanguages) {
+      // Set selected options for multiple select
+      Array.from(translationLanguages.options).forEach(option => {
+        option.selected = result.translationLanguages.includes(option.value);
+      });
+    }
+    if (result.speechLanguage) {
+      speechLanguage.value = result.speechLanguage;
     }
 
     // Apply theme
@@ -45,9 +58,12 @@ document.addEventListener('DOMContentLoaded', function() {
   simplificationLevel.addEventListener('change', updateSaveButton);
 
   theme.addEventListener('change', function() {
-    applyTheme(theme.value);
-    updateSaveButton();
-  });
+     applyTheme(theme.value);
+     updateSaveButton();
+   });
+
+  translationLanguages.addEventListener('change', updateSaveButton);
+  speechLanguage.addEventListener('change', updateSaveButton);
 
   // Save settings with validation
   saveButton.addEventListener('click', function() {
@@ -55,10 +71,14 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
+    const selectedLanguages = Array.from(translationLanguages.selectedOptions).map(option => option.value);
+
     const settings = {
       preferredLanguage: preferredLanguage.value.trim(),
       simplificationLevel: simplificationLevel.value,
-      theme: theme.value
+      theme: theme.value,
+      translationLanguages: selectedLanguages,
+      speechLanguage: speechLanguage.value
     };
 
     saveButton.disabled = true;
@@ -131,10 +151,14 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function updateSaveButton() {
+    const selectedLanguages = Array.from(translationLanguages.selectedOptions).map(option => option.value);
+
     const currentSettings = {
       preferredLanguage: preferredLanguage.value.trim(),
       simplificationLevel: simplificationLevel.value,
-      theme: theme.value
+      theme: theme.value,
+      translationLanguages: selectedLanguages,
+      speechLanguage: speechLanguage.value
     };
 
     const hasChanges = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);

@@ -111,6 +111,11 @@ Access settings by clicking the extension icon and then "Settings":
 - **Theme**: Choose light, dark, or auto (system preference)
 - Affects the appearance of floating UI and result modals
 
+### Language Settings
+- **Supported Translation Languages**: Select multiple languages for enhanced translation suggestions
+- **Voice Recognition Language**: Choose language for speech-to-text input (supports 13+ languages)
+- Includes Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, Hindi, Russian, and more
+
 ## 🔧 Technical Details
 
 ### Requirements
@@ -249,9 +254,9 @@ This project aligns with the Google Chrome Built-in AI Challenge 2025 criteria:
 
 - [x] Voice-to-text for question asking
 - [x] Export functionality for summaries and quizzes
-- [ ] Integration with popular learning platforms
+- [x] Integration with popular learning platforms
 - [ ] Custom AI model fine-tuning
-- [ ] Multi-language support expansion
+- [x] Multi-language support expansion
 - [x] Dark mode theme
 - [x] Keyboard shortcuts
 
