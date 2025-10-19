@@ -2,16 +2,18 @@ document.addEventListener('DOMContentLoaded', function() {
   const saveButton = document.getElementById('save');
   const preferredLanguage = document.getElementById('preferredLanguage');
   const simplificationLevel = document.getElementById('simplificationLevel');
+  const theme = document.getElementById('theme');
   const successMessage = document.getElementById('success-message');
   const aiStatusDiv = document.getElementById('ai-status');
 
   let originalSettings = {};
 
   // Load saved settings
-  chrome.storage.sync.get(['preferredLanguage', 'simplificationLevel'], function(result) {
+  chrome.storage.sync.get(['preferredLanguage', 'simplificationLevel', 'theme'], function(result) {
     originalSettings = {
       preferredLanguage: result.preferredLanguage || '',
-      simplificationLevel: result.simplificationLevel || '5th grader'
+      simplificationLevel: result.simplificationLevel || '5th grader',
+      theme: result.theme || 'light'
     };
 
     if (result.preferredLanguage) {
@@ -20,6 +22,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (result.simplificationLevel) {
       simplificationLevel.value = result.simplificationLevel;
     }
+    if (result.theme) {
+      theme.value = result.theme;
+    }
+
+    // Apply theme
+    applyTheme(result.theme || 'light');
 
     // Update save button state
     updateSaveButton();
@@ -36,6 +44,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
   simplificationLevel.addEventListener('change', updateSaveButton);
 
+  theme.addEventListener('change', function() {
+    applyTheme(theme.value);
+    updateSaveButton();
+  });
+
   // Save settings with validation
   saveButton.addEventListener('click', function() {
     if (!validateForm()) {
@@ -44,7 +57,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const settings = {
       preferredLanguage: preferredLanguage.value.trim(),
-      simplificationLevel: simplificationLevel.value
+      simplificationLevel: simplificationLevel.value,
+      theme: theme.value
     };
 
     saveButton.disabled = true;
@@ -119,12 +133,23 @@ document.addEventListener('DOMContentLoaded', function() {
   function updateSaveButton() {
     const currentSettings = {
       preferredLanguage: preferredLanguage.value.trim(),
-      simplificationLevel: simplificationLevel.value
+      simplificationLevel: simplificationLevel.value,
+      theme: theme.value
     };
 
     const hasChanges = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
     saveButton.disabled = !hasChanges;
     saveButton.style.opacity = hasChanges ? '1' : '0.6';
+  }
+
+  function applyTheme(themeValue) {
+    let resolvedTheme = themeValue;
+
+    if (themeValue === 'auto') {
+      resolvedTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
   }
 
   function showError(message) {

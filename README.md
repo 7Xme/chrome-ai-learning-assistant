@@ -107,12 +107,25 @@ Access settings by clicking the extension icon and then "Settings":
 - **Default Level**: Choose how complex text should be simplified
 - Options: 5th Grader, Middle School, High School, Business Professional, Technical Expert
 
+### Theme Settings
+- **Theme**: Choose light, dark, or auto (system preference)
+- Affects the appearance of floating UI and result modals
+
 ## 🔧 Technical Details
 
 ### Requirements
 - **Browser**: Google Chrome (latest stable version)
 - **AI Model**: Gemini Nano (built-in Chrome AI)
-- **Permissions**: Active tab access, scripting, storage
+- **Permissions**: Active tab access, scripting, storage, microphone (for voice input)
+
+### Keyboard Shortcuts
+- **Ctrl+Shift+S**: Summarize selected text
+- **Ctrl+Shift+T**: Translate selected text
+- **Ctrl+Shift+Q**: Ask questions about selected text
+- **Ctrl+Shift+V**: Voice input for questions (uses microphone)
+- **Ctrl+Shift+Z**: Generate quiz from selected text
+- **Ctrl+Shift+R**: Simplify selected text
+- **Ctrl+Shift+C**: Check/correct answers
 
 ### Architecture
 ```
@@ -234,13 +247,13 @@ This project aligns with the Google Chrome Built-in AI Challenge 2025 criteria:
 
 ## 🔮 Future Enhancements
 
-- [ ] Voice-to-text for question asking
-- [ ] Export functionality for summaries and quizzes
+- [x] Voice-to-text for question asking
+- [x] Export functionality for summaries and quizzes
 - [ ] Integration with popular learning platforms
 - [ ] Custom AI model fine-tuning
 - [ ] Multi-language support expansion
-- [ ] Dark mode theme
-- [ ] Keyboard shortcuts
+- [x] Dark mode theme
+- [x] Keyboard shortcuts
 
 ## 📊 Version History
 

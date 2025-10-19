@@ -1,6 +1,26 @@
+/* Dark mode support */
+:root {
+  --ala-bg-color: white;
+  --ala-text-color: #333;
+  --ala-border-color: rgba(255,255,255,0.2);
+  --ala-tooltip-bg: white;
+  --ala-modal-bg: white;
+  --ala-loading-bg: white;
+}
+
+[data-theme="dark"] {
+  --ala-bg-color: #2a2a2a;
+  --ala-text-color: #e0e0e0;
+  --ala-border-color: rgba(74,158,255,0.3);
+  --ala-tooltip-bg: #1a1a1a;
+  --ala-modal-bg: #1a1a1a;
+  --ala-loading-bg: #2a2a2a;
+}
+
 #ala-floating-ui {
   position: absolute;
-  background: white;
+  background: var(--ala-bg-color);
+  color: var(--ala-text-color);
   border-radius: 12px;
   padding: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.15);
@@ -8,7 +28,7 @@
   display: none;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   min-width: 160px;
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid var(--ala-border-color);
   backdrop-filter: blur(10px);
 }
 
@@ -21,7 +41,7 @@
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-bottom: 8px solid white;
+  border-bottom: 8px solid var(--ala-tooltip-bg);
 }
 
 #ala-floating-ui button {
@@ -71,6 +91,7 @@
 #summarize-btn::before { content: "📝 "; }
 #translate-btn::before { content: "🌍 "; }
 #prompt-btn::before { content: "❓ "; }
+#voice-btn::before { content: "🎤 "; }
 #quiz-btn::before { content: "📚 "; }
 #simplify-btn::before { content: "🔄 "; }
 #proofread-btn::before { content: "✓ "; }
@@ -107,7 +128,8 @@
 }
 
 .ala-loading-modal {
-  background: white;
+  background: var(--ala-loading-bg);
+  color: var(--ala-text-color);
   padding: 30px;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.2);
@@ -117,6 +139,17 @@
 
 .ala-loading-modal .loading-text {
   margin-top: 15px;
-  color: #666;
+  color: var(--ala-text-color);
+  opacity: 0.8;
   font-size: 14px;
+}
+
+/* Result modal dark mode support */
+#ala-result {
+  background: var(--ala-modal-bg) !important;
+  color: var(--ala-text-color) !important;
+}
+
+#ala-result h3 {
+  color: var(--ala-text-color) !important;
 }

@@ -7,6 +7,94 @@ document.addEventListener('mouseup', function(event) {
   }
 });
 
+// Keyboard shortcuts
+document.addEventListener('keydown', function(event) {
+  // Only trigger shortcuts if no input/textarea is focused
+  if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.contentEditable === 'true') {
+    return;
+  }
+
+  const selectedText = window.getSelection().toString().trim();
+
+  // Ctrl+Shift+S: Summarize
+  if (event.ctrlKey && event.shiftKey && event.key === 'S') {
+    event.preventDefault();
+    if (selectedText.length > 0) {
+      handleSummarize(selectedText);
+    }
+    return;
+  }
+
+  // Ctrl+Shift+T: Translate
+  if (event.ctrlKey && event.shiftKey && event.key === 'T') {
+    event.preventDefault();
+    if (selectedText.length > 0) {
+      handleTranslate(selectedText);
+    }
+    return;
+  }
+
+  // Ctrl+Shift+Q: Ask Question
+  if (event.ctrlKey && event.shiftKey && event.key === 'Q') {
+    event.preventDefault();
+    if (selectedText.length > 0) {
+      handlePrompt(selectedText);
+    }
+    return;
+  }
+
+  // Ctrl+Shift+Z: Quiz
+  if (event.ctrlKey && event.shiftKey && event.key === 'Z') {
+    event.preventDefault();
+    if (selectedText.length > 0) {
+      handleQuiz(selectedText);
+    }
+    return;
+  }
+
+  // Ctrl+Shift+R: Simplify
+  if (event.ctrlKey && event.shiftKey && event.key === 'R') {
+    event.preventDefault();
+    if (selectedText.length > 0) {
+      handleSimplify(selectedText);
+    }
+    return;
+  }
+
+  // Ctrl+Shift+C: Check Answer
+  if (event.ctrlKey && event.shiftKey && event.key === 'C') {
+    event.preventDefault();
+    if (selectedText.length > 0) {
+      handleProofread(selectedText);
+    }
+    return;
+  }
+
+  // Ctrl+Shift+V: Voice Ask
+  if (event.ctrlKey && event.shiftKey && event.key === 'V') {
+    event.preventDefault();
+    if (selectedText.length > 0) {
+      handleVoicePrompt(selectedText);
+    }
+    return;
+  }
+});
+
+// Apply theme on content script load
+chrome.storage.sync.get(['theme'], function(result) {
+  applyTheme(result.theme || 'light');
+});
+
+function applyTheme(themeValue) {
+  let resolvedTheme = themeValue;
+
+  if (themeValue === 'auto') {
+    resolvedTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  document.documentElement.setAttribute('data-theme', resolvedTheme);
+}
+
 function showFloatingUI(x, y, text) {
   let ui = document.getElementById('ala-floating-ui');
   if (!ui) {
@@ -16,6 +104,7 @@ function showFloatingUI(x, y, text) {
       <button id="summarize-btn">Summarize</button>
       <button id="translate-btn">Translate</button>
       <button id="prompt-btn">Ask About</button>
+      <button id="voice-btn">🎤 Voice Ask</button>
       <button id="quiz-btn">Quiz</button>
       <button id="simplify-btn">Simplify</button>
       <button id="proofread-btn">Check Answer</button>
@@ -46,6 +135,10 @@ function showFloatingUI(x, y, text) {
     document.getElementById('proofread-btn').addEventListener('click', (e) => {
       e.preventDefault();
       handleProofread(text);
+    });
+    document.getElementById('voice-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      handleVoicePrompt(text);
     });
   }
   ui.style.left = x + 'px';
@@ -127,6 +220,54 @@ async function handleSimplify(text) {
 
 async function handleProofread(text) {
   showLoading('Checking answer...');
+async function handleVoicePrompt(text) {
+  // Check if Speech Recognition is supported
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    displayResult('Voice Input Error', 'Speech recognition is not supported in your browser. Please use a modern version of Chrome.');
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US'; // Default to English, can be made configurable later
+
+  recognition.onstart = function() {
+    showLoading('Listening... Speak your question now.');
+  };
+
+  recognition.onresult = async function(event) {
+    const transcript = event.results[0][0].transcript;
+    showLoading('Processing your voice question...');
+
+    try {
+      const answer = await callAPI('prompt', { text, question: transcript });
+      displayResult(`Voice Question: "${transcript}"`, answer);
+    } catch (error) {
+      displayResult('Voice Processing Error', `Error processing your voice input: ${error.message}`);
+    } finally {
+      hideLoading();
+    }
+  };
+
+  recognition.onerror = function(event) {
+    hideLoading();
+    displayResult('Voice Recognition Error', `Speech recognition error: ${event.error}. Please try again or use text input.`);
+  };
+
+  recognition.onend = function() {
+    // Hide loading if still showing
+    hideLoading();
+  };
+
+  try {
+    recognition.start();
+  } catch (error) {
+    displayResult('Voice Start Error', `Could not start voice recognition: ${error.message}`);
+  }
+}
   try {
     const corrected = await callAPI('proofreader', { text });
     displayResult('Corrected Answer', corrected);
@@ -279,21 +420,24 @@ function displayResult(title, content) {
         <span style="margin-right: 8px;">${getTitleIcon(title)}</span>
         ${title}
       </h3>
-      <button id="close-result-btn" style="
-        background: none;
-        border: none;
-        font-size: 24px;
-        cursor: pointer;
-        color: #666;
-        padding: 5px;
-        border-radius: 50%;
-        transition: all 0.2s;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      " title="Close">×</button>
+      <div style="display: flex; gap: 8px;">
+        ${shouldShowExport(title) ? '<button id="export-result-btn" style="background: #4CAF50; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;" title="Export">📄 Export</button>' : ''}
+        <button id="close-result-btn" style="
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: #666;
+          padding: 5px;
+          border-radius: 50%;
+          transition: all 0.2s;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        " title="Close">×</button>
+      </div>
     </div>
     <div style="color: #555; line-height: 1.7; font-size: 15px;">${formattedContent}</div>
   `;
@@ -303,6 +447,14 @@ function displayResult(title, content) {
   closeBtn.addEventListener('click', () => {
     resultDiv.style.display = 'none';
   });
+
+  // Add export functionality
+  const exportBtn = resultDiv.querySelector('#export-result-btn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      exportResult(title, content);
+    });
+  }
 
   closeBtn.addEventListener('mouseenter', () => {
     closeBtn.style.background = '#f0f0f0';
@@ -317,18 +469,160 @@ function displayResult(title, content) {
   resultDiv.style.display = 'block';
 }
 
+function shouldShowExport(title) {
+  // Show export button for summaries and quizzes
+  return title === 'Summary' || title === 'Quiz' || title.startsWith('Voice Question:');
+}
+
 function getTitleIcon(title) {
   const icons = {
     'Summary': '📝',
     'Translation': '🌍',
-    'Answer': '💡',
-    'Quiz': '📚',
-    'Simplified': '🔄',
-    'Corrected Answer': '✓',
-    'Error': '❌',
-    'AI model not available': '⚠️'
-  };
+}
+
+function exportResult(title, content) {
+  try {
+    // Create export content
+    const timestamp = new Date().toLocaleString();
+    const exportTitle = `${title} - ${timestamp}`;
+    const exportContent = `${exportTitle}\n\n${content}\n\n--- Generated by Adaptive Learning Assistant ---`;
+
+    // Create blob and download
+    const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    // Create temporary download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${exportTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Clean up
+    URL.revokeObjectURL(url);
+
+    // Show success message
+    showNotification('Export successful!', 'File downloaded to your downloads folder.');
+  } catch (error) {
+    showNotification('Export failed', `Error exporting file: ${error.message}`, 'error');
+  }
+}
+
+function showNotification(message, details, type = 'success') {
+  // Remove existing notification
+  const existing = document.getElementById('ala-notification');
+  if (existing) existing.remove();
+
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.id = 'ala-notification';
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+    color: white;
+    padding: 16px;
+    border-radius: 8px;
+    z-index: 10002;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    max-width: 300px;
+  `;
+
+  notification.innerHTML = `
+    <div style="font-weight: 600; margin-bottom: 4px;">${message}</div>
+    <div style="font-size: 14px; opacity: 0.9;">${details}</div>
+  `;
+
+  document.body.appendChild(notification);
+
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.style.opacity = '0';
+      notification.style.transform = 'translateX(100%)';
+      notification.style.transition = 'all 0.3s ease';
+      setTimeout(() => notification.remove(), 300);
+    }
+  }, 3000);
+}
   return icons[title] || '📄';
+}
+
+function shouldShowExport(title) {
+  // Show export button for summaries and quizzes
+  return title === 'Summary' || title === 'Quiz' || title.startsWith('Voice Question:');
+}
+
+function exportResult(title, content) {
+  try {
+    // Create export content
+    const timestamp = new Date().toLocaleString();
+    const exportTitle = `${title} - ${timestamp}`;
+    const exportContent = `${exportTitle}\n\n${content}\n\n--- Generated by Adaptive Learning Assistant ---`;
+
+    // Create blob and download
+    const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    // Create temporary download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${exportTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Clean up
+    URL.revokeObjectURL(url);
+
+    // Show success message
+    showNotification('Export successful!', 'File downloaded to your downloads folder.');
+  } catch (error) {
+    showNotification('Export failed', `Error exporting file: ${error.message}`, 'error');
+  }
+}
+
+function showNotification(message, details, type = 'success') {
+  // Remove existing notification
+  const existing = document.getElementById('ala-notification');
+  if (existing) existing.remove();
+
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.id = 'ala-notification';
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+    color: white;
+    padding: 16px;
+    border-radius: 8px;
+    z-index: 10002;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    max-width: 300px;
+  `;
+
+  notification.innerHTML = `
+    <div style="font-weight: 600; margin-bottom: 4px;">${message}</div>
+    <div style="font-size: 14px; opacity: 0.9;">${details}</div>
+  `;
+
+  document.body.appendChild(notification);
+
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.style.opacity = '0';
+      notification.style.transform = 'translateX(100%)';
+      notification.style.transition = 'all 0.3s ease';
+      setTimeout(() => notification.remove(), 300);
+    }
+  }, 3000);
 }
 
 function formatResponseContent(title, content) {
